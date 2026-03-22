@@ -1,0 +1,109 @@
+{
+  "projectType": "api-service",
+  "projectName": "Auth Backend",
+  "projectDescription": "A production-ready authentication API built with Fastify and Supabase, providing email/password login, OTP, OAuth (Google & Apple), JWT token management, and password reset flows.",
+  "theme": "sequoia",
+  "primaryColor": "#3B5BDB",
+  "lightColor": "#748FFC",
+  "darkColor": "#1C2D6B",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart", "configuration"]
+          },
+          {
+            "group": "Authentication Guides",
+            "pages": [
+              "guides/email-password",
+              "guides/otp-login",
+              "guides/oauth",
+              "guides/token-management",
+              "guides/password-reset"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/docker",
+              "deployment/cloudflare-workers"
+            ]
+          },
+          {
+            "group": "Error Handling",
+            "pages": ["errors/overview"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Auth Endpoints",
+            "pages": [
+              "api-reference/signup",
+              "api-reference/login",
+              "api-reference/logout",
+              "api-reference/refresh-token",
+              "api-reference/validate-token"
+            ]
+          },
+          {
+            "group": "OTP",
+            "pages": [
+              "api-reference/otp-login",
+              "api-reference/verify-otp"
+            ]
+          },
+          {
+            "group": "OAuth",
+            "pages": [
+              "api-reference/oauth-url",
+              "api-reference/oauth-callback"
+            ]
+          },
+          {
+            "group": "Password",
+            "pages": [
+              "api-reference/forgot-password",
+              "api-reference/reset-password"
+            ]
+          },
+          {
+            "group": "User",
+            "pages": [
+              "api-reference/me"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Email/password registration and login",
+    "OTP (passwordless) authentication via email",
+    "OAuth integration with Google and Apple using PKCE flow",
+    "JWT access and refresh token management via HTTP-only cookies",
+    "Secure password reset via email link",
+    "Zod schema validation on all endpoints",
+    "Structured error responses with consistent error codes",
+    "Docker and Cloudflare Workers deployment support"
+  ],
+  "publicApiSurface": [
+    "POST /api/v1/auth/signup",
+    "POST /api/v1/auth/login",
+    "POST /api/v1/auth/login/otp",
+    "POST /api/v1/auth/verify-otp",
+    "POST /api/v1/auth/refresh",
+    "POST /api/v1/auth/logout",
+    "POST /api/v1/auth/forgot-password",
+    "POST /api/v1/auth/reset-password",
+    "GET /api/v1/auth/oauth/:provider",
+    "POST /api/v1/auth/oauth/:provider/callback",
+    "GET /api/v1/auth/me",
+    "POST /api/v1/auth/validate-token"
+  ]
+}
