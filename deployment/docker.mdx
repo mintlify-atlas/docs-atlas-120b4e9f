@@ -73,15 +73,16 @@ CMD ["node", "dist/server.js"]
     # Frontend URL
     FRONTEND_URL=https://your-frontend.com
 
-    # OAuth Providers (Optional)
-    GOOGLE_CLIENT_ID=
-    GOOGLE_CLIENT_SECRET=
-
+    # Apple Sign-In (Optional)
     APPLE_CLIENT_ID=
     APPLE_TEAM_ID=
     APPLE_KEY_ID=
     APPLE_PRIVATE_KEY=
     ```
+
+    <Info>
+      Google OAuth credentials are not required here — they are configured in your Supabase project under **Authentication → Providers → Google**.
+    </Info>
 
     <Warning>
       Never commit `.env` to version control. It is listed in `.dockerignore` and `.gitignore` by default.

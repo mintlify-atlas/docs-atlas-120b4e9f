@@ -8,7 +8,7 @@ Auth Backend issues two tokens after a successful authentication:
 - **Access token** — a short-lived JWT used to prove identity on every request.
 - **Refresh token** — a long-lived token used to obtain a new access token without requiring the user to log in again.
 
-Both tokens are stored exclusively in **HTTP-only cookies** — they are never returned in a response body after a standard login.
+Both tokens are stored in **HTTP-only cookies** after email/password login and OAuth authentication. The one exception is **OTP login** — `POST /verify-otp` returns tokens directly in the response body without setting cookies, leaving storage to the client.
 
 ---
 

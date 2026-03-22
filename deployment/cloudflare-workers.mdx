@@ -12,7 +12,11 @@ description: "Deploy auth-backend to Cloudflare Workers as a serverless function
 
 ## Overview
 
-auth-backend supports deployment to [Cloudflare Workers](https://workers.cloudflare.com) via the `wrangler` CLI. The entry point for Workers is `src/index.ts`. Workers run on Cloudflare's edge network and do not use a persistent Node.js process — environment variables are supplied as **secrets** rather than a `.env` file.
+auth-backend includes a `wrangler.toml` configuration for deployment to [Cloudflare Workers](https://workers.cloudflare.com). Workers run on Cloudflare's edge network and do not use a persistent Node.js process — environment variables are supplied as **secrets** rather than a `.env` file.
+
+<Warning>
+  The `wrangler.toml` references `src/index.ts` as the Workers entry point, but this file does not exist in the repository. To deploy to Cloudflare Workers, you must create a `src/index.ts` that exports a Workers-compatible fetch handler using the Fastify app. The standard `src/server.ts` binds to a port and is not directly compatible with the Workers runtime.
+</Warning>
 
 ## wrangler.toml configuration
 
@@ -89,19 +93,19 @@ The `compatibility_flags = ["nodejs_compat"]` setting enables the Node.js compat
 
     Each command prompts you to paste the secret value. The value is never stored in plaintext.
 
-    If you use OAuth providers, add these optional secrets as well:
+    If you use Apple Sign-In, add these optional secrets as well:
 
     ```bash
-    # Optional — Google OAuth
-    npx wrangler secret put GOOGLE_CLIENT_ID
-    npx wrangler secret put GOOGLE_CLIENT_SECRET
-
     # Optional — Apple Sign-In
     npx wrangler secret put APPLE_CLIENT_ID
     npx wrangler secret put APPLE_TEAM_ID
     npx wrangler secret put APPLE_KEY_ID
     npx wrangler secret put APPLE_PRIVATE_KEY
     ```
+
+    <Info>
+      Google OAuth credentials are not required as backend environment variables — they are configured directly in your Supabase project under **Authentication → Providers → Google**.
+    </Info>
 
     <Tip>
       To list secrets already configured for your Worker, run `npx wrangler secret list`.
@@ -139,14 +143,16 @@ The following table lists every variable from `.env.example` and how to supply i
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key (admin access) |
 | `JWT_SECRET` | Yes | Secret used to sign JWTs (minimum 32 characters) |
 | `FRONTEND_URL` | Yes | Allowed CORS origin for the frontend |
-| `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |
 | `APPLE_CLIENT_ID` | No | Apple Sign-In service ID |
 | `APPLE_TEAM_ID` | No | Apple developer team ID |
 | `APPLE_KEY_ID` | No | Apple Sign-In key ID |
 | `APPLE_PRIVATE_KEY` | No | Apple Sign-In private key (PEM format) |
 
 `ENVIRONMENT` is set as a plain `[vars]` entry in `wrangler.toml` and does not need to be a secret.
+
+<Note>
+  Google OAuth credentials are not required as backend environment variables. They are configured in your Supabase dashboard under **Authentication → Providers → Google**.
+</Note>
 
 <Warning>
   The `SUPABASE_SERVICE_ROLE_KEY` grants full database access. Treat it as a sensitive credential and never expose it in client-side code or logs.

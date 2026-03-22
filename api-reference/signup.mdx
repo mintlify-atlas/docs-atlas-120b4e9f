@@ -130,7 +130,7 @@ const data = await response.json();
 ```
 
 <Note>
-  If email confirmation is enabled on your Supabase project, `tokens` fields will be `undefined` until the user confirms their email. The user object is still returned.
+  If email confirmation is enabled on your Supabase project, `tokens` fields will be `null` until the user confirms their email. The user object is still returned with the response.
 </Note>
 
 ## Errors

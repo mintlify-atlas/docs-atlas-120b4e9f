@@ -89,6 +89,12 @@
             "pages": [
               "api-reference/me"
             ]
+          },
+          {
+            "group": "Health",
+            "pages": [
+              "api-reference/health"
+            ]
           }
         ]
       }

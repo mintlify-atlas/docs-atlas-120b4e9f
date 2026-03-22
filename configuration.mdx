@@ -98,29 +98,22 @@ OAuth credentials are optional. Omit these variables if you do not need Google o
 
 ### Google
 
-To enable Google Sign-In, create OAuth credentials in the [Google Cloud Console](https://console.cloud.google.com).
+Google Sign-In credentials are configured directly in **Supabase**, not in the backend's environment variables. The backend uses Supabase's OAuth abstraction — no Google credentials are needed in your `.env` file.
 
-1. Go to **APIs & Services → Credentials**.
-2. Click **Create credentials → OAuth client ID**.
-3. Set the application type to **Web application**.
-4. Add your callback URL to **Authorized redirect URIs**: `http://localhost:8080/api/v1/auth/oauth/google/callback`.
-5. Copy the client ID and secret.
+To set up Google Sign-In:
 
-<ParamField path="GOOGLE_CLIENT_ID" type="string">
-  Your Google OAuth 2.0 client ID.
+1. Go to the [Google Cloud Console](https://console.cloud.google.com) → **APIs & Services → Credentials**.
+2. Click **Create credentials → OAuth client ID** (application type: **Web application**).
+3. Add the Supabase callback URL to **Authorized redirect URIs**:
+   ```
+   https://<your-project>.supabase.co/auth/v1/callback
+   ```
+4. Copy the **Client ID** and **Client Secret**.
+5. In your Supabase dashboard, go to **Authentication → Providers → Google**, enable it, and paste the credentials.
 
-  ```env
-  GOOGLE_CLIENT_ID=your-google-client-id
-  ```
-</ParamField>
-
-<ParamField path="GOOGLE_CLIENT_SECRET" type="string">
-  Your Google OAuth 2.0 client secret.
-
-  ```env
-  GOOGLE_CLIENT_SECRET=your-google-client-secret
-  ```
-</ParamField>
+<Info>
+  No Google environment variables are required in the backend `.env` file. All OAuth credentials are stored and managed by Supabase.
+</Info>
 
 ### Apple
 

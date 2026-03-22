@@ -51,6 +51,7 @@ For validation failures, the response includes an additional `details` array wit
 | `FORBIDDEN` | 403 | `ForbiddenError` | Authenticated but not permitted to access the resource |
 | `NOT_FOUND` | 404 | `NotFoundError` | The requested resource does not exist |
 | `CONFLICT` | 409 | `ConflictError` | The request conflicts with existing data (e.g. duplicate email) |
+| `REQUEST_ERROR` | varies | Fastify error | A framework-level error (e.g. malformed payload, route not found) |
 | `INTERNAL_ERROR` | 500 | `AppError` / unhandled | An unexpected server-side error occurred |
 
 ## Error examples
