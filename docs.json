@@ -1,122 +1,97 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Auth Backend",
+  "theme": "sequoia",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#3B5BDB",
+    "light": "#748FFC",
+    "dark": "#1C2D6B"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/eggarcia98/auth-backend"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/eggarcia98/auth-backend"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart", "configuration"]
+          },
+          {
+            "group": "Authentication Guides",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "guides/email-password",
+              "guides/otp-login",
+              "guides/oauth",
+              "guides/token-management",
+              "guides/password-reset"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Deployment",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "deployment/docker",
+              "deployment/cloudflare-workers"
             ]
           },
           {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
-            ]
+            "group": "Error Handling",
+            "pages": ["errors/overview"]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Auth Endpoints",
             "pages": [
-              "api-reference/introduction"
+              "api-reference/signup",
+              "api-reference/login",
+              "api-reference/logout",
+              "api-reference/refresh-token",
+              "api-reference/validate-token"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "OTP",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api-reference/otp-login",
+              "api-reference/verify-otp"
+            ]
+          },
+          {
+            "group": "OAuth",
+            "pages": [
+              "api-reference/oauth-url",
+              "api-reference/oauth-callback"
+            ]
+          },
+          {
+            "group": "Password",
+            "pages": [
+              "api-reference/forgot-password",
+              "api-reference/reset-password"
+            ]
+          },
+          {
+            "group": "User",
+            "pages": [
+              "api-reference/me"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

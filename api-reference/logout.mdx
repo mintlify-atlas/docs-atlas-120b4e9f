@@ -1,0 +1,80 @@
+---
+title: 'Log out'
+description: 'Invalidate the current session and clear authentication cookies.'
+---
+
+`POST /api/v1/auth/logout`
+
+Invalidates the current access token and clears the `accessToken` and `refreshToken` cookies.
+
+## Request
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication. Format: `Bearer <accessToken>`.
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Whether the request succeeded.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="properties">
+    <ResponseField name="message" type="string">
+      Confirmation message: `"Logged out successfully"`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Cookies cleared
+
+On success, the server clears the following cookies:
+
+| Cookie | Action |
+|---|---|
+| `accessToken` | Cleared |
+| `refreshToken` | Cleared |
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://your-api.example.com/api/v1/auth/logout \
+  --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+```
+
+```typescript TypeScript
+const response = await fetch('https://your-api.example.com/api/v1/auth/logout', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${accessToken}`,
+  },
+  credentials: 'include', // Required to clear cookies
+});
+
+const data = await response.json();
+```
+
+</CodeGroup>
+
+### Success response (200)
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Logged out successfully"
+  }
+}
+```
+
+## Errors
+
+| HTTP status | Code | Description |
+|---|---|---|
+| `401` | `UNAUTHORIZED` | The `Authorization` header is missing or the token is invalid. |

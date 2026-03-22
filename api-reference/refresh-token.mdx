@@ -1,0 +1,123 @@
+---
+title: 'Refresh token'
+description: 'Obtain a new access token and refresh token using the current refresh token cookie.'
+---
+
+`POST /api/v1/auth/refresh`
+
+Uses the `refreshToken` cookie to issue a new access token and refresh token. Both cookies are updated on success.
+
+## Request
+
+### Cookies
+
+<ParamField body="refreshToken" type="string" required>
+  The refresh token stored in the `refreshToken` HTTP-only cookie. This is set automatically by the browser after a successful [login](/api-reference/login) or previous token refresh.
+</ParamField>
+
+No request body is required.
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Whether the request succeeded.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="properties">
+    <ResponseField name="user" type="object">
+      <Expandable title="properties">
+        <ResponseField name="id" type="string">
+          The unique identifier for the user.
+        </ResponseField>
+        <ResponseField name="email" type="string">
+          The user's email address.
+        </ResponseField>
+        <ResponseField name="emailVerified" type="boolean">
+          Whether the user's email address has been verified.
+        </ResponseField>
+        <ResponseField name="provider" type="string">
+          The authentication provider. One of `email`, `google`, or `apple`.
+        </ResponseField>
+        <ResponseField name="createdAt" type="string">
+          ISO 8601 timestamp when the user was created.
+        </ResponseField>
+        <ResponseField name="updatedAt" type="string">
+          ISO 8601 timestamp when the user was last updated.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="tokens" type="object">
+      <Expandable title="properties">
+        <ResponseField name="accessToken" type="string">
+          The new short-lived JWT for authenticating requests.
+        </ResponseField>
+        <ResponseField name="refreshToken" type="string">
+          The new long-lived refresh token.
+        </ResponseField>
+        <ResponseField name="expiresIn" type="number">
+          Number of seconds until the new access token expires.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Cookies updated
+
+On success, both cookies are replaced with new values:
+
+| Cookie | Description |
+|---|---|
+| `accessToken` | New short-lived JWT. |
+| `refreshToken` | New long-lived refresh token. Expires after 7 days. |
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://your-api.example.com/api/v1/auth/refresh \
+  --cookie 'refreshToken=v1.MRjY...'
+```
+
+```typescript TypeScript
+const response = await fetch('https://your-api.example.com/api/v1/auth/refresh', {
+  method: 'POST',
+  credentials: 'include', // Required to send and receive cookies
+});
+
+const data = await response.json();
+```
+
+</CodeGroup>
+
+### Success response (200)
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "b3e1c2d4-...",
+      "email": "user@example.com",
+      "emailVerified": true,
+      "provider": "email",
+      "createdAt": "2024-01-15T10:30:00.000Z",
+      "updatedAt": "2024-01-15T10:30:00.000Z"
+    },
+    "tokens": {
+      "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "refreshToken": "v1.XkZp...",
+      "expiresIn": 3600
+    }
+  }
+}
+```
+
+## Errors
+
+| HTTP status | Code | Description |
+|---|---|---|
+| `401` | `UNAUTHORIZED` | The `refreshToken` cookie is missing, invalid, or expired. The user must log in again. |

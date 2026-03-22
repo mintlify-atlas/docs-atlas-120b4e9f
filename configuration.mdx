@@ -1,0 +1,192 @@
+---
+title: "Configuration"
+description: "Complete reference for all environment variables required to run Auth Backend."
+---
+
+Auth Backend is configured entirely through environment variables. Copy `.env.example` to `.env` and fill in the values before starting the server.
+
+```bash
+cp .env.example .env
+```
+
+The server validates all required variables at startup using Zod. If any required variable is missing or invalid, the process exits with a descriptive error.
+
+## Server
+
+<ParamField path="ENVIRONMENT" type="string" default="development">
+  The runtime environment. Accepted values are `development`, `staging`, or `production`. Controls logging behavior and other environment-specific settings.
+</ParamField>
+
+<ParamField path="PORT" type="number" default="8080">
+  The port the HTTP server listens on. When deploying to Cloud Run or Docker, the container binds to `0.0.0.0` on this port.
+</ParamField>
+
+<ParamField path="FRONTEND_URL" type="string" required>
+  The origin URL of your frontend application (e.g. `http://localhost:3000` or `https://app.example.com`). This value is used to configure CORS — only requests from this origin are accepted. It is also used as the redirect destination for OAuth and password reset flows.
+
+  ```env
+  FRONTEND_URL=http://localhost:3000
+  ```
+</ParamField>
+
+## Supabase
+
+Auth Backend uses Supabase for user management and authentication. You need a Supabase project before you can run the server.
+
+**To create a Supabase project:**
+
+1. Go to [supabase.com](https://supabase.com) and sign in.
+2. Click **New project** and enter a name and password.
+3. Wait for the project to provision, then go to **Project Settings → API**.
+4. Copy the three values below into your `.env`.
+
+<ParamField path="SUPABASE_URL" type="string" required>
+  Your Supabase project URL. Found under **Project Settings → API → Project URL**.
+
+  ```env
+  SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
+  ```
+</ParamField>
+
+<ParamField path="SUPABASE_ANON_KEY" type="string" required>
+  The public anonymous key for your Supabase project. Found under **Project Settings → API → Project API keys → anon public**.
+
+  This key is safe to use in server-side code and is used for unauthenticated operations.
+
+  ```env
+  SUPABASE_ANON_KEY=your-anon-key-here
+  ```
+</ParamField>
+
+<ParamField path="SUPABASE_SERVICE_ROLE_KEY" type="string" required>
+  The service role key for your Supabase project. Found under **Project Settings → API → Project API keys → service_role**.
+
+  This key bypasses Row Level Security and is used for admin operations such as creating and managing users.
+
+  <Warning>
+    Never expose the `service_role` key in client-side code, public repositories, or logs. Treat it as a secret credential.
+  </Warning>
+
+  ```env
+  SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+  ```
+</ParamField>
+
+## JWT
+
+<ParamField path="JWT_SECRET" type="string" required>
+  A secret key used to sign and verify JWTs. Must be at least 32 characters long.
+
+  Generate a secure value with:
+
+  ```bash
+  openssl rand -base64 32
+  ```
+
+  ```env
+  JWT_SECRET=your-super-secret-jwt-key-min-32-chars
+  ```
+
+  <Tip>
+    Use a randomly generated value of 32 or more characters. Avoid reusing this value across environments.
+  </Tip>
+</ParamField>
+
+## OAuth providers (optional)
+
+OAuth credentials are optional. Omit these variables if you do not need Google or Apple Sign-In.
+
+### Google
+
+To enable Google Sign-In, create OAuth credentials in the [Google Cloud Console](https://console.cloud.google.com).
+
+1. Go to **APIs & Services → Credentials**.
+2. Click **Create credentials → OAuth client ID**.
+3. Set the application type to **Web application**.
+4. Add your callback URL to **Authorized redirect URIs**: `http://localhost:8080/api/v1/auth/oauth/google/callback`.
+5. Copy the client ID and secret.
+
+<ParamField path="GOOGLE_CLIENT_ID" type="string">
+  Your Google OAuth 2.0 client ID.
+
+  ```env
+  GOOGLE_CLIENT_ID=your-google-client-id
+  ```
+</ParamField>
+
+<ParamField path="GOOGLE_CLIENT_SECRET" type="string">
+  Your Google OAuth 2.0 client secret.
+
+  ```env
+  GOOGLE_CLIENT_SECRET=your-google-client-secret
+  ```
+</ParamField>
+
+### Apple
+
+To enable Apple Sign-In, you need an Apple Developer account and a Services ID.
+
+<Note>
+  Apple Sign-In requires a registered domain and an HTTPS callback URL. It cannot be tested on `localhost` without a tunnel such as [ngrok](https://ngrok.com).
+</Note>
+
+<ParamField path="APPLE_CLIENT_ID" type="string">
+  Your Apple Services ID (e.g. `com.example.app.service`).
+
+  ```env
+  APPLE_CLIENT_ID=your-apple-services-id
+  ```
+</ParamField>
+
+<ParamField path="APPLE_TEAM_ID" type="string">
+  Your 10-character Apple Team ID. Found in the Apple Developer portal under **Membership**.
+
+  ```env
+  APPLE_TEAM_ID=XXXXXXXXXX
+  ```
+</ParamField>
+
+<ParamField path="APPLE_KEY_ID" type="string">
+  The key identifier for your Apple Sign-In private key. Found under **Certificates, Identifiers & Profiles → Keys**.
+
+  ```env
+  APPLE_KEY_ID=XXXXXXXXXX
+  ```
+</ParamField>
+
+<ParamField path="APPLE_PRIVATE_KEY" type="string">
+  The contents of the `.p8` private key file downloaded from the Apple Developer portal. Include the full key including the header and footer lines.
+
+  ```env
+  APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIGH...\n-----END PRIVATE KEY-----"
+  ```
+</ParamField>
+
+## CORS and cookies
+
+### CORS
+
+CORS is configured automatically using the `FRONTEND_URL` variable. The server allows requests from that origin with credentials and supports the following methods: `GET`, `POST`, `PUT`, `DELETE`, and `OPTIONS`.
+
+To allow multiple origins or a wildcard, you would need to modify the CORS configuration in `src/app.ts`:
+
+```typescript src/app.ts
+await fastify.register(cors, {
+  origin: config.env.FRONTEND_URL, // Change to an array or regex for multiple origins
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+});
+```
+
+### Cookies
+
+Access and refresh tokens are stored as HTTP-only cookies. These cookies are set automatically on login and cleared on logout. They are not accessible from JavaScript, which prevents XSS-based token theft.
+
+| Cookie | Description |
+|--------|-------------|
+| `accessToken` | Short-lived JWT used to authenticate requests. |
+| `refreshToken` | Long-lived token used to obtain a new access token via `POST /api/v1/auth/refresh`. |
+
+<Tip>
+  When making requests from a browser, include `credentials: 'include'` in your `fetch` options so cookies are sent with cross-origin requests.
+</Tip>

@@ -1,0 +1,81 @@
+---
+title: 'Send OTP'
+description: 'Send a one-time password to a user email address to initiate passwordless login.'
+---
+
+Send a one-time password (OTP) to the specified email address. The user receives a 6-digit code they can use to authenticate via [Verify OTP](/api-reference/verify-otp).
+
+## Request
+
+**`POST /api/v1/auth/login/otp`**
+
+No authentication required.
+
+### Body
+
+<ParamField body="email" type="string" required>
+  The email address to send the OTP to. Must be a valid email format.
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean" required>
+  Indicates whether the request succeeded. Always `true` on success.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="properties">
+    <ResponseField name="message" type="string">
+      Confirmation message. Value: `"OTP sent to email"`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://your-api.com/api/v1/auth/login/otp \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "email": "user@example.com"
+  }'
+```
+
+```typescript TypeScript
+const response = await fetch('https://your-api.com/api/v1/auth/login/otp', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email: 'user@example.com' }),
+});
+
+const data = await response.json();
+// { success: true, data: { message: 'OTP sent to email' } }
+```
+
+</CodeGroup>
+
+### Success response
+
+```json 200
+{
+  "success": true,
+  "data": {
+    "message": "OTP sent to email"
+  }
+}
+```
+
+### Error responses
+
+```json 400
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid email address"
+  }
+}
+```

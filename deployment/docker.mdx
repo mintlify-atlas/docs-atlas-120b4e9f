@@ -1,0 +1,215 @@
+---
+title: "Docker"
+description: "Deploy auth-backend as a Docker container using the provided Dockerfile or docker-compose."
+---
+
+<Info>
+  **Prerequisites**:
+  - [Docker](https://docs.docker.com/get-docker/) installed (version 20+)
+  - A `.env` file populated from `.env.example`
+  - A Supabase project with the required keys
+</Info>
+
+## Overview
+
+The auth-backend ships with a production-ready `Dockerfile` based on `node:22-alpine`. It uses [pnpm](https://pnpm.io) via corepack, compiles TypeScript, and starts the compiled server on port `8080`.
+
+## Dockerfile
+
+```dockerfile Dockerfile
+# Cloud Run Dockerfile for auth-backend
+FROM node:22-alpine AS base
+WORKDIR /app
+
+# Install pnpm via corepack
+RUN corepack enable && corepack prepare pnpm@10.14.0 --activate
+
+# Copy manifest files first for better caching
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source
+COPY . .
+
+# Build TypeScript
+RUN pnpm run build
+
+ENV NODE_ENV=production
+ENV PORT=8080
+
+# Cloud Run listens on $PORT; Fastify binds to 0.0.0.0
+CMD ["node", "dist/server.js"]
+```
+
+## Deploy with Docker
+
+<Steps>
+  <Step title="Prepare your environment file">
+    Copy the example environment file and fill in your values:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Edit `.env` with your Supabase credentials and other required values:
+
+    ```bash .env
+    # Environment
+    ENVIRONMENT=production
+
+    # Server Configuration
+    PORT=8080
+
+    # Supabase Configuration
+    SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
+    SUPABASE_ANON_KEY=your-anon-key-here
+    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+
+    # JWT Configuration
+    JWT_SECRET=your-super-secret-jwt-key-min-32-chars
+
+    # Frontend URL
+    FRONTEND_URL=https://your-frontend.com
+
+    # OAuth Providers (Optional)
+    GOOGLE_CLIENT_ID=
+    GOOGLE_CLIENT_SECRET=
+
+    APPLE_CLIENT_ID=
+    APPLE_TEAM_ID=
+    APPLE_KEY_ID=
+    APPLE_PRIVATE_KEY=
+    ```
+
+    <Warning>
+      Never commit `.env` to version control. It is listed in `.dockerignore` and `.gitignore` by default.
+    </Warning>
+  </Step>
+
+  <Step title="Build the Docker image">
+    Run the following command from the project root:
+
+    ```bash
+    docker build -t auth-backend .
+    ```
+
+    The build copies only the files not listed in `.dockerignore`, installs dependencies, and compiles TypeScript to `dist/`.
+
+    <Tip>
+      Tag your image with a version for easier rollbacks: `docker build -t auth-backend:1.0.0 .`
+    </Tip>
+  </Step>
+
+  <Step title="Run the container">
+    Start the container and inject environment variables from your `.env` file:
+
+    ```bash
+    docker run -p 8080:8080 --env-file .env auth-backend
+    ```
+
+    The server is now available at `http://localhost:8080`.
+
+    To run the container in the background, add the `-d` flag:
+
+    ```bash
+    docker run -d -p 8080:8080 --env-file .env --name auth-backend auth-backend
+    ```
+  </Step>
+</Steps>
+
+## Port mapping
+
+The container exposes port `8080`. The `docker run` flag `-p 8080:8080` maps the host port (left) to the container port (right). To serve on a different host port, change the left value:
+
+```bash
+# Serve on host port 3000, container still listens on 8080
+docker run -p 3000:8080 --env-file .env auth-backend
+```
+
+## Deploy with Docker Compose
+
+For local development or single-host production deployments, use the included `docker-compose.yml`:
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  auth-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: auth-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      # Optional OAuth credentials
+      - APPLE_CLIENT_ID=${APPLE_CLIENT_ID:-}
+      - APPLE_TEAM_ID=${APPLE_TEAM_ID:-}
+      - APPLE_KEY_ID=${APPLE_KEY_ID:-}
+      - APPLE_PRIVATE_KEY=${APPLE_PRIVATE_KEY:-}
+    restart: unless-stopped
+    networks:
+      - auth-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  auth-network:
+    driver: bridge
+```
+
+Docker Compose reads variable values from your `.env` file automatically. Start the stack:
+
+```bash
+# Build and start
+docker compose up --build
+
+# Start in the background
+docker compose up --build -d
+
+# Stop the stack
+docker compose down
+```
+
+## Health checks
+
+The `docker-compose.yml` configures a built-in health check that polls `GET /health` every 30 seconds:
+
+| Setting | Value | Description |
+|---|---|---|
+| `interval` | 30s | Time between checks |
+| `timeout` | 10s | Maximum time to wait for a response |
+| `retries` | 3 | Consecutive failures before marking unhealthy |
+| `start_period` | 40s | Grace period before health checks begin |
+
+You can verify the container health status with:
+
+```bash
+docker inspect --format='{{.State.Health.Status}}' auth-backend
+```
+
+## Production considerations
+
+- **`NODE_ENV=production`** — Set by the Dockerfile. Fastify enables production-mode logging and optimizations automatically.
+- **Secrets management** — Prefer a secrets manager (AWS Secrets Manager, GCP Secret Manager, Docker Secrets) over plain `.env` files in production.
+- **Restart policy** — The `docker-compose.yml` sets `restart: unless-stopped`, which restarts the container after crashes or host reboots.
+- **Resource limits** — Add `deploy.resources.limits` in your Compose file to cap CPU and memory usage.
+- **Read-only filesystem** — Consider adding `read_only: true` to the service definition for additional hardening.
+
+<Note>
+  The Dockerfile is optimized for [Google Cloud Run](https://cloud.google.com/run), which injects the `PORT` environment variable and expects the process to bind to `0.0.0.0`.
+</Note>

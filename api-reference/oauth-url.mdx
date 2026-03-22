@@ -1,0 +1,78 @@
+---
+title: 'Get OAuth URL'
+description: 'Generate an authorization URL to redirect users to a third-party OAuth provider for authentication.'
+---
+
+Generate the authorization URL for a supported OAuth provider. Redirect the user to this URL to begin the OAuth flow. The URL includes a PKCE challenge for enhanced security.
+
+<Info>
+  This endpoint uses the PKCE (Proof Key for Code Exchange) flow. After the user authenticates, the provider redirects back to your frontend with an authorization `code`. Pass that code to [OAuth callback](/api-reference/oauth-callback) to complete authentication.
+</Info>
+
+## Request
+
+**`GET /api/v1/auth/oauth/:provider`**
+
+No authentication required.
+
+### Path parameters
+
+<ParamField path="provider" type="string" required placeholder="google">
+  The OAuth provider to use. Accepted values: `google`, `apple`.
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean" required>
+  Indicates whether the request succeeded. Always `true` on success.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="properties">
+    <ResponseField name="url" type="string">
+      The authorization URL to redirect the user to. Includes OAuth provider, scopes, redirect URI, and PKCE challenge parameters.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request GET \
+  --url https://your-api.com/api/v1/auth/oauth/google
+```
+
+```typescript TypeScript
+const response = await fetch('https://your-api.com/api/v1/auth/oauth/google');
+const { data } = await response.json();
+
+// Redirect the user to the OAuth provider
+window.location.href = data.url;
+```
+
+</CodeGroup>
+
+### Success response
+
+```json 200
+{
+  "success": true,
+  "data": {
+    "url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...&redirect_uri=...&response_type=code&scope=email+profile&code_challenge=...&code_challenge_method=S256"
+  }
+}
+```
+
+### Error responses
+
+```json 400
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Failed to generate google authorization URL"
+  }
+}
+```

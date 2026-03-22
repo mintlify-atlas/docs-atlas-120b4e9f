@@ -1,0 +1,166 @@
+---
+title: 'Validate token'
+description: 'Verify the current session and automatically refresh tokens if the access token has expired.'
+---
+
+`POST /api/v1/auth/validate-token`
+
+Checks whether the current session is valid. The endpoint first tries to verify the access token. If that fails, it attempts to use the refresh token to issue new tokens. Use this endpoint to silently refresh sessions without requiring the user to log in again.
+
+## Request
+
+No request body is required.
+
+### Headers
+
+<ParamField header="Authorization" type="string">
+  Bearer token for authentication. Format: `Bearer <accessToken>`. Optional — the access token can also be supplied via the `accessToken` cookie.
+</ParamField>
+
+### Cookies
+
+<ParamField body="accessToken" type="string">
+  The access token cookie set after login. Used as a fallback if the `Authorization` header is not provided.
+</ParamField>
+
+<ParamField body="refreshToken" type="string">
+  The refresh token cookie set after login. Used to issue new tokens if the access token is invalid or expired.
+</ParamField>
+
+### Token resolution order
+
+1. Access token from `Authorization: Bearer <token>` header.
+2. Access token from the `accessToken` cookie.
+3. If the access token is missing or invalid, the `refreshToken` cookie is used to issue new tokens.
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Whether the request succeeded.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Either `"Token is valid"` or `"Token refreshed successfully"`.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="properties">
+    <ResponseField name="user" type="object">
+      <Expandable title="properties">
+        <ResponseField name="id" type="string">
+          The unique identifier for the user.
+        </ResponseField>
+        <ResponseField name="email" type="string">
+          The user's email address.
+        </ResponseField>
+        <ResponseField name="emailVerified" type="boolean">
+          Whether the user's email address has been verified.
+        </ResponseField>
+        <ResponseField name="provider" type="string">
+          The authentication provider. One of `email`, `google`, or `apple`.
+        </ResponseField>
+        <ResponseField name="createdAt" type="string">
+          ISO 8601 timestamp when the user was created.
+        </ResponseField>
+        <ResponseField name="updatedAt" type="string">
+          ISO 8601 timestamp when the user was last updated.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="tokenRefreshed" type="boolean">
+      `true` if the access token was expired and new tokens were issued using the refresh token. `false` if the original access token was still valid.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Cookies updated on refresh
+
+If the access token was expired and a refresh occurred, both cookies are updated:
+
+| Cookie | Description |
+|---|---|
+| `accessToken` | New short-lived JWT. |
+| `refreshToken` | New long-lived refresh token. Expires after 7 days. |
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+# With Authorization header
+curl --request POST \
+  --url https://your-api.example.com/api/v1/auth/validate-token \
+  --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+
+# With cookies only
+curl --request POST \
+  --url https://your-api.example.com/api/v1/auth/validate-token \
+  --cookie 'accessToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; refreshToken=v1.MRjY...'
+```
+
+```typescript TypeScript
+const response = await fetch('https://your-api.example.com/api/v1/auth/validate-token', {
+  method: 'POST',
+  headers: {
+    // Optional: include the access token in the header
+    'Authorization': `Bearer ${accessToken}`,
+  },
+  credentials: 'include', // Required to send and receive cookies
+});
+
+const data = await response.json();
+
+if (data.data?.tokenRefreshed) {
+  // New tokens have been set in cookies automatically
+  console.log('Session silently refreshed');
+}
+```
+
+</CodeGroup>
+
+### Success response — valid token (200)
+
+```json
+{
+  "success": true,
+  "message": "Token is valid",
+  "data": {
+    "user": {
+      "id": "b3e1c2d4-...",
+      "email": "user@example.com",
+      "emailVerified": true,
+      "provider": "email",
+      "createdAt": "2024-01-15T10:30:00.000Z",
+      "updatedAt": "2024-01-15T10:30:00.000Z"
+    },
+    "tokenRefreshed": false
+  }
+}
+```
+
+### Success response — token refreshed (200)
+
+```json
+{
+  "success": true,
+  "message": "Token refreshed successfully",
+  "data": {
+    "user": {
+      "id": "b3e1c2d4-...",
+      "email": "user@example.com",
+      "emailVerified": true,
+      "provider": "email",
+      "createdAt": "2024-01-15T10:30:00.000Z",
+      "updatedAt": "2024-01-15T10:30:00.000Z"
+    },
+    "tokenRefreshed": true
+  }
+}
+```
+
+## Errors
+
+| HTTP status | Code | Description |
+|---|---|---|
+| `401` | `UNAUTHORIZED` | No tokens were provided, or both the access token and refresh token are invalid or expired. The user must log in again. |
+| `500` | `INTERNAL_ERROR` | An unexpected error occurred during token validation. |

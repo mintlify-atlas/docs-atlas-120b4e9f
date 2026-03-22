@@ -1,0 +1,168 @@
+---
+title: 'OAuth callback'
+description: 'Exchange an OAuth authorization code for an authenticated session using the PKCE flow.'
+---
+
+Complete the OAuth authentication flow by exchanging the authorization code received from the provider for a user session. On success, sets `accessToken` and `refreshToken` as HTTP-only cookies and returns the authenticated user and tokens in the response body.
+
+<Info>
+  This endpoint uses PKCE (Proof Key for Code Exchange). The backend calls `exchangeCodeForSession` with the authorization code, which Supabase validates against the stored code verifier. Each code can only be used once.
+</Info>
+
+## Request
+
+**`POST /api/v1/auth/oauth/:provider/callback`**
+
+No authentication required.
+
+### Path parameters
+
+<ParamField path="provider" type="string" required placeholder="google">
+  The OAuth provider the code was issued by. Accepted values: `google`, `apple`.
+</ParamField>
+
+### Body
+
+<ParamField body="code" type="string" required>
+  The authorization code returned by the OAuth provider in the redirect URL query parameter `code`. Extract this from the callback URL on your frontend before sending it here.
+</ParamField>
+
+## Response
+
+On success, the response sets two HTTP-only cookies:
+
+- `accessToken` — short-lived JWT for authenticating API requests.
+- `refreshToken` — long-lived token (7 days) for obtaining new access tokens.
+
+<ResponseField name="success" type="boolean" required>
+  Indicates whether the request succeeded. Always `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation message. Value: `"OAuth authentication successful, tokens set in cookies"`.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="properties">
+    <ResponseField name="user" type="object">
+      <Expandable title="properties">
+        <ResponseField name="id" type="string">
+          Unique user identifier.
+        </ResponseField>
+        <ResponseField name="email" type="string">
+          User's email address.
+        </ResponseField>
+        <ResponseField name="emailVerified" type="boolean">
+          Whether the user's email has been verified.
+        </ResponseField>
+        <ResponseField name="provider" type="string">
+          Authentication provider. One of: `google`, `apple`.
+        </ResponseField>
+        <ResponseField name="createdAt" type="string">
+          ISO 8601 timestamp of account creation.
+        </ResponseField>
+        <ResponseField name="updatedAt" type="string">
+          ISO 8601 timestamp of the last account update.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="tokens" type="object">
+      <Expandable title="properties">
+        <ResponseField name="accessToken" type="string">
+          JWT access token for authenticating subsequent requests.
+        </ResponseField>
+        <ResponseField name="refreshToken" type="string">
+          Token used to obtain a new access token when the current one expires.
+        </ResponseField>
+        <ResponseField name="expiresIn" type="number">
+          Access token lifetime in seconds.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://your-api.com/api/v1/auth/oauth/google/callback \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "code": "4/0AX4XfWh..."
+  }'
+```
+
+```typescript TypeScript
+// In your OAuth callback route (e.g., /auth/google/callback)
+const urlParams = new URLSearchParams(window.location.search);
+const code = urlParams.get('code');
+
+if (code) {
+  const response = await fetch(
+    'https://your-api.com/api/v1/auth/oauth/google/callback',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+      credentials: 'include', // required to receive and store cookies
+    }
+  );
+
+  const result = await response.json();
+  if (result.success) {
+    // Tokens are now in HTTP-only cookies
+    window.location.href = '/dashboard';
+  }
+}
+```
+
+</CodeGroup>
+
+### Success response
+
+```json 200
+{
+  "success": true,
+  "message": "OAuth authentication successful, tokens set in cookies",
+  "data": {
+    "user": {
+      "id": "usr_01h9...",
+      "email": "user@example.com",
+      "emailVerified": true,
+      "provider": "google",
+      "createdAt": "2024-01-15T10:30:00.000Z",
+      "updatedAt": "2024-01-15T10:30:00.000Z"
+    },
+    "tokens": {
+      "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "expiresIn": 3600
+    }
+  }
+}
+```
+
+### Error responses
+
+```json 400
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Authorization code is required"
+  }
+}
+```
+
+```json 401
+{
+  "success": false,
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Failed to authenticate with OAuth provider"
+  }
+}
+```

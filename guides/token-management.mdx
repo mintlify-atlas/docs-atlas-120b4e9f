@@ -1,0 +1,214 @@
+---
+title: "Token Management"
+description: "How JWT access and refresh tokens are issued, stored in HTTP-only cookies, rotated, and validated."
+---
+
+Auth Backend issues two tokens after a successful authentication:
+
+- **Access token** — a short-lived JWT used to prove identity on every request.
+- **Refresh token** — a long-lived token used to obtain a new access token without requiring the user to log in again.
+
+Both tokens are stored exclusively in **HTTP-only cookies** — they are never returned in a response body after a standard login.
+
+---
+
+## Cookie configuration
+
+Tokens are set on the response by the controller with the following attributes:
+
+| Attribute | Access token | Refresh token |
+|-----------|-------------|---------------|
+| `httpOnly` | `true` | `true` |
+| `secure` | `true` in production | `true` in production |
+| `sameSite` | `strict` (email/password) / `lax` (OAuth) | `strict` (email/password) / `lax` (OAuth) |
+| `maxAge` | `expiresIn` from Supabase session (seconds) | 7 days (`7 * 24 * 60 * 60 * 1000` ms) |
+
+<Info>
+  `httpOnly: true` means JavaScript running in the browser **cannot** read the cookie value. This protects tokens from XSS attacks.
+</Info>
+
+<Note>
+  The `sameSite` value is `lax` for OAuth callbacks to allow the redirect from the provider to carry the cookie. All other endpoints use `strict`.
+</Note>
+
+---
+
+## Token lifetimes
+
+| Token | Lifetime | Controlled by |
+|-------|----------|---------------|
+| Access token | Typically **1 hour** (Supabase default) | Supabase project settings |
+| Refresh token | **7 days** | Hard-coded cookie `maxAge` in the controller |
+
+You can change the access token lifetime in your Supabase project under **Authentication → Configuration → JWT expiry limit**.
+
+---
+
+## Refreshing tokens
+
+When the access token expires, use the refresh token stored in the `refreshToken` cookie to get a new pair.
+
+### Request
+
+```bash curl
+curl -X POST https://your-domain.com/api/v1/auth/refresh \
+  -b cookies.txt \
+  -c cookies.txt
+```
+
+The server reads the `refreshToken` cookie automatically — no request body is needed.
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "email": "user@example.com",
+      "emailVerified": true,
+      "provider": "email",
+      "createdAt": "2024-01-15T10:00:00.000Z",
+      "updatedAt": "2024-01-15T10:00:00.000Z"
+    },
+    "tokens": {
+      "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "refreshToken": "dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4...",
+      "expiresIn": 3600
+    }
+  }
+}
+```
+
+New `accessToken` and `refreshToken` cookies are written on success. The old tokens are replaced.
+
+### Error — missing or invalid refresh token
+
+```json
+{
+  "success": false,
+  "error": "No refresh token provided"
+}
+```
+
+---
+
+## Validating tokens
+
+`POST /api/v1/auth/validate-token` performs a combined validate-or-refresh operation. It is designed for frontend app startup checks where you want to confirm the session is still alive and silently refresh it if needed.
+
+### Logic (`validateAndRefreshToken`)
+
+```
+1. Read accessToken from Authorization header or cookie
+2. Read refreshToken from cookie
+3. If neither token exists → 401, clear cookies
+4. If accessToken exists:
+   a. Call supabase.auth.getUser(accessToken)
+   b. If valid → return { user, tokenRefreshed: false }
+   c. If invalid → fall through to refresh step
+5. If refreshToken exists:
+   a. Call supabase.auth.refreshSession(refreshToken)
+   b. If valid → set new cookies, return { user, tokenRefreshed: true }
+   c. If invalid → 401, clear cookies
+```
+
+### Request
+
+```bash curl
+curl -X POST https://your-domain.com/api/v1/auth/validate-token \
+  -b cookies.txt \
+  -c cookies.txt
+```
+
+You can also pass the access token in the `Authorization` header:
+
+```bash curl
+curl -X POST https://your-domain.com/api/v1/auth/validate-token \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+### Response — token valid
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "email": "user@example.com",
+      "emailVerified": true,
+      "provider": "email",
+      "createdAt": "2024-01-15T10:00:00.000Z",
+      "updatedAt": "2024-01-15T10:00:00.000Z"
+    },
+    "tokenRefreshed": false
+  },
+  "message": "Token is valid"
+}
+```
+
+### Response — token refreshed
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "email": "user@example.com",
+      "emailVerified": true,
+      "provider": "email",
+      "createdAt": "2024-01-15T10:00:00.000Z",
+      "updatedAt": "2024-01-15T10:00:00.000Z"
+    },
+    "tokenRefreshed": true
+  },
+  "message": "Token refreshed successfully"
+}
+```
+
+---
+
+## Frontend integration tips
+
+**On every page load**, call `POST /validate-token` with `credentials: 'include'`. Use `tokenRefreshed` to know whether a new access token was issued.
+
+```typescript TypeScript
+async function checkSession() {
+  const res = await fetch('/api/v1/auth/validate-token', {
+    method: 'POST',
+    credentials: 'include', // send and store cookies
+  });
+
+  if (!res.ok) {
+    // 401 — redirect to login
+    window.location.href = '/login';
+    return null;
+  }
+
+  const { data } = await res.json();
+  // data.user is available; data.tokenRefreshed indicates if cookies were rotated
+  return data.user;
+}
+```
+
+**For protected API calls**, the `accessToken` cookie is sent automatically by the browser. No manual token handling is required.
+
+**For protected routes that use the `Authorization` header** (e.g., server-side rendering or non-browser clients), read the `accessToken` cookie and attach it as `Bearer <token>` in the `Authorization` header.
+
+<Warning>
+  Never store tokens in `localStorage` or `sessionStorage`. HTTP-only cookies prevent JavaScript from accessing the raw token value, which is the primary XSS mitigation.
+</Warning>
+
+---
+
+## Error cases
+
+| Scenario | HTTP status | Error |
+|----------|-------------|-------|
+| No tokens present | `401` | `No tokens provided` |
+| Access token expired, no refresh token | `401` | `Access token expired and no refresh token available` |
+| Refresh token invalid or expired | `401` | `Refresh token invalid or expired. Please login again.` |
+| Unexpected server error | `500` | `Token validation failed` |

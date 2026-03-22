@@ -1,0 +1,308 @@
+---
+title: "Error handling"
+description: "Standard error response format, error codes, and client-side handling for Auth Backend."
+---
+
+All API responses follow a consistent structure. When a request fails, the response body always contains `success: false` alongside an `error` object describing what went wrong.
+
+## Error response format
+
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Human-readable description of the error",
+    "code": "ERROR_CODE"
+  }
+}
+```
+
+For validation failures, the response includes an additional `details` array with field-level information:
+
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Validation failed",
+    "code": "VALIDATION_ERROR",
+    "details": [
+      {
+        "code": "invalid_type",
+        "expected": "string",
+        "received": "undefined",
+        "path": ["email"],
+        "message": "Required"
+      }
+    ]
+  }
+}
+```
+
+<Note>
+  The `details` array is only present on `VALIDATION_ERROR` responses. All other error types return only `message` and `code`.
+</Note>
+
+## Error codes
+
+| Code | HTTP status | Class | Description |
+|---|---|---|---|
+| `VALIDATION_ERROR` | 400 | `ValidationError` | Request body or query parameters failed schema validation |
+| `UNAUTHORIZED` | 401 | `UnauthorizedError` | Missing or invalid authentication credentials |
+| `FORBIDDEN` | 403 | `ForbiddenError` | Authenticated but not permitted to access the resource |
+| `NOT_FOUND` | 404 | `NotFoundError` | The requested resource does not exist |
+| `CONFLICT` | 409 | `ConflictError` | The request conflicts with existing data (e.g. duplicate email) |
+| `INTERNAL_ERROR` | 500 | `AppError` / unhandled | An unexpected server-side error occurred |
+
+## Error examples
+
+<AccordionGroup>
+  <Accordion title="VALIDATION_ERROR — 400">
+    Returned when the request body or query string fails Zod schema validation. The `details` array maps directly to Zod's error format, giving you the exact field path and reason.
+
+    ```json
+    {
+      "success": false,
+      "error": {
+        "message": "Validation failed",
+        "code": "VALIDATION_ERROR",
+        "details": [
+          {
+            "code": "invalid_string",
+            "validation": "email",
+            "path": ["email"],
+            "message": "Invalid email"
+          },
+          {
+            "code": "too_small",
+            "minimum": 8,
+            "type": "string",
+            "inclusive": true,
+            "path": ["password"],
+            "message": "String must contain at least 8 character(s)"
+          }
+        ]
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="UNAUTHORIZED — 401">
+    Returned when a protected endpoint is called without a valid session token, or when the provided token has expired.
+
+    ```json
+    {
+      "success": false,
+      "error": {
+        "message": "Unauthorized",
+        "code": "UNAUTHORIZED"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="FORBIDDEN — 403">
+    Returned when the authenticated user does not have permission to perform the requested action.
+
+    ```json
+    {
+      "success": false,
+      "error": {
+        "message": "Forbidden",
+        "code": "FORBIDDEN"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="NOT_FOUND — 404">
+    Returned when the requested resource (user, token, etc.) cannot be found.
+
+    ```json
+    {
+      "success": false,
+      "error": {
+        "message": "Resource not found",
+        "code": "NOT_FOUND"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="CONFLICT — 409">
+    Returned when the request would create a duplicate record, such as registering with an email address that is already in use.
+
+    ```json
+    {
+      "success": false,
+      "error": {
+        "message": "Email already in use",
+        "code": "CONFLICT"
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="INTERNAL_ERROR — 500">
+    Returned for any unhandled or unexpected server-side exception. The message is intentionally generic to avoid leaking implementation details.
+
+    ```json
+    {
+      "success": false,
+      "error": {
+        "message": "Internal server error",
+        "code": "INTERNAL_ERROR"
+      }
+    }
+    ```
+
+    <Warning>
+      `INTERNAL_ERROR` responses indicate an unexpected failure. Check your server logs for the full stack trace. The error middleware logs all request errors using Pino before sending the response.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## How errors are generated
+
+The server uses a hierarchy of typed error classes. Throwing one of these anywhere in a route handler or middleware automatically produces the correct HTTP status and error code.
+
+```typescript
+// src/utils/errors.ts
+export class AppError extends Error {
+  constructor(
+    public readonly message: string,
+    public readonly statusCode: number = 500,
+    public readonly code: string = "INTERNAL_ERROR",
+    public readonly isOperational: boolean = true
+  ) { ... }
+}
+
+export class ValidationError extends AppError {
+  constructor(message: string) {
+    super(message, 400, "VALIDATION_ERROR");
+  }
+}
+
+export class UnauthorizedError extends AppError {
+  constructor(message: string = "Unauthorized") {
+    super(message, 401, "UNAUTHORIZED");
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message: string = "Forbidden") {
+    super(message, 403, "FORBIDDEN");
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(message: string = "Resource not found") {
+    super(message, 404, "NOT_FOUND");
+  }
+}
+
+export class ConflictError extends AppError {
+  constructor(message: string) {
+    super(message, 409, "CONFLICT");
+  }
+}
+```
+
+The global error handler in `src/middleware/error.middleware.ts` intercepts all thrown errors and maps them to the standard response shape:
+
+1. **Zod errors** — caught by `instanceof ZodError`, serialized with field-level `details`.
+2. **App errors** — caught by `instanceof AppError`, status and code taken from the class instance.
+3. **Fastify errors** — framework-level errors (e.g. route not found, payload too large) returned with their native `statusCode`.
+4. **Unknown errors** — anything else returns `500 INTERNAL_ERROR`.
+
+<Tip>
+  Always throw typed error classes in your route handlers rather than constructing raw response objects. This ensures every error is logged consistently and the response format never diverges from the standard shape.
+</Tip>
+
+Validation is applied at the route level using `validateBody` and `validateQuery` helpers. They parse the incoming data with a Zod schema and re-throw any `ZodError`, which the error middleware then formats automatically.
+
+```typescript
+// src/middleware/validation.middleware.ts
+export function validateBody(schema: ZodSchema) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    request.body = schema.parse(request.body); // throws ZodError on failure
+  };
+}
+```
+
+## Handling errors on the client side
+
+Use the `ApiResponse` type to model every response. Check the `success` flag before accessing `data`; otherwise read `error.code` to branch your error handling.
+
+```typescript
+import type { ApiResponse } from "./types/api.types";
+
+interface LoginData {
+  accessToken: string;
+  user: { id: string; email: string };
+}
+
+type ErrorCode =
+  | "VALIDATION_ERROR"
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
+  | "NOT_FOUND"
+  | "CONFLICT"
+  | "INTERNAL_ERROR";
+
+async function login(email: string, password: string): Promise<LoginData> {
+  const res = await fetch("/api/v1/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+    credentials: "include",
+  });
+
+  const body: ApiResponse<LoginData> = await res.json();
+
+  if (!body.success) {
+    const code = body.error?.code as ErrorCode;
+
+    switch (code) {
+      case "VALIDATION_ERROR":
+        // Surface field-level messages from body.error.details
+        throw new Error(`Invalid input: ${body.error?.message}`);
+      case "UNAUTHORIZED":
+        throw new Error("Invalid email or password.");
+      case "CONFLICT":
+        throw new Error("An account with this email already exists.");
+      default:
+        throw new Error(body.error?.message ?? "An unexpected error occurred.");
+    }
+  }
+
+  return body.data!;
+}
+```
+
+### Handling validation details
+
+When `code` is `VALIDATION_ERROR`, iterate the `details` array to map errors back to individual form fields:
+
+```typescript
+interface ValidationDetail {
+  path: string[];
+  message: string;
+  code: string;
+}
+
+function extractFieldErrors(
+  details: ValidationDetail[]
+): Record<string, string> {
+  return details.reduce<Record<string, string>>((acc, issue) => {
+    const field = issue.path.join(".");
+    if (field) acc[field] = issue.message;
+    return acc;
+  }, {});
+}
+
+// Usage
+if (!body.success && body.error?.code === "VALIDATION_ERROR") {
+  const fieldErrors = extractFieldErrors(body.error.details ?? []);
+  // { "email": "Invalid email", "password": "String must contain at least 8 character(s)" }
+}
+```

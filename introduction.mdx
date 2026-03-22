@@ -1,0 +1,103 @@
+---
+title: "Introduction"
+description: "A production-ready authentication API built with Fastify and Supabase"
+---
+
+# Auth Backend
+
+Auth Backend is a production-ready authentication service built with **Fastify**, **Supabase**, and **TypeScript**. It provides a complete authentication solution with multiple login strategies, secure token management, and flexible deployment options.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get your authentication backend running in minutes
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Configure environment variables and Supabase settings
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/signup">
+    Explore the full REST API documentation
+  </Card>
+  <Card title="OAuth Guide" icon="key" href="/guides/oauth">
+    Set up Google and Apple Sign-In with PKCE
+  </Card>
+</CardGroup>
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Email & Password Auth" icon="envelope">
+    Secure user registration and login with Zod-validated inputs and strong password requirements
+  </Card>
+  <Card title="OTP / Passwordless" icon="message">
+    Send one-time passwords via email for frictionless, passwordless authentication
+  </Card>
+  <Card title="OAuth (Google & Apple)" icon="shield-check">
+    Full OAuth 2.0 with PKCE flow for Google and Apple Sign-In — no client secrets required
+  </Card>
+  <Card title="JWT Token Management" icon="lock">
+    Access and refresh tokens stored in secure HTTP-only cookies with automatic rotation
+  </Card>
+  <Card title="Password Reset" icon="rotate-left">
+    Secure, email-based password recovery with redirect links
+  </Card>
+  <Card title="Docker & Cloudflare" icon="cloud">
+    Deploy with Docker or as a Cloudflare Worker for serverless edge authentication
+  </Card>
+</CardGroup>
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Framework | Fastify 4 |
+| Auth Provider | Supabase |
+| Validation | Zod |
+| Language | TypeScript |
+| Testing | Vitest |
+| Logging | Pino |
+| Package Manager | pnpm |
+
+## API Overview
+
+All endpoints are prefixed with `/api/v1/auth`. The base URL depends on your deployment environment:
+
+```
+Development: http://localhost:8080/api/v1/auth
+Production:  https://your-domain.com/api/v1/auth
+```
+
+### Available endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| `POST` | `/signup` | Register a new user | No |
+| `POST` | `/login` | Email/password login | No |
+| `POST` | `/login/otp` | Request OTP via email | No |
+| `POST` | `/verify-otp` | Verify OTP code | No |
+| `POST` | `/refresh` | Refresh access token | No (cookie) |
+| `POST` | `/logout` | Log out current user | Yes |
+| `POST` | `/forgot-password` | Request password reset | No |
+| `POST` | `/reset-password` | Reset with new password | Yes |
+| `GET` | `/oauth/:provider` | Get OAuth authorization URL | No |
+| `POST` | `/oauth/:provider/callback` | Handle OAuth callback | No |
+| `GET` | `/me` | Get current user profile | Yes |
+| `POST` | `/validate-token` | Validate or refresh token | No |
+
+## Error Format
+
+All errors follow a consistent JSON format:
+
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Human-readable error message",
+    "code": "ERROR_CODE",
+    "details": []
+  }
+}
+```
+
+<Note>
+  Auth Backend uses Supabase as its authentication provider. You will need a Supabase project to use this service. See the [Configuration](/configuration) guide to get set up.
+</Note>

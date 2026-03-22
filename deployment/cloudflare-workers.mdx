@@ -1,0 +1,186 @@
+---
+title: "Cloudflare Workers"
+description: "Deploy auth-backend to Cloudflare Workers as a serverless function using Wrangler."
+---
+
+<Info>
+  **Prerequisites**:
+  - A [Cloudflare account](https://dash.cloudflare.com/sign-up)
+  - [Node.js](https://nodejs.org) 18+ and pnpm installed
+  - Dependencies installed (`pnpm install`)
+</Info>
+
+## Overview
+
+auth-backend supports deployment to [Cloudflare Workers](https://workers.cloudflare.com) via the `wrangler` CLI. The entry point for Workers is `src/index.ts`. Workers run on Cloudflare's edge network and do not use a persistent Node.js process — environment variables are supplied as **secrets** rather than a `.env` file.
+
+## wrangler.toml configuration
+
+The project includes a `wrangler.toml` that configures the Workers deployment:
+
+```toml wrangler.toml
+name = "auth-backend"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+
+# Secrets (don't commit these!)
+# Add via: wrangler secret put SECRET_NAME
+# Required secrets:
+# - SUPABASE_URL
+# - SUPABASE_ANON_KEY
+# - SUPABASE_SERVICE_ROLE_KEY
+# - JWT_SECRET
+# - FRONTEND_URL
+# Optional (for OAuth):
+# - GOOGLE_CLIENT_ID
+# - GOOGLE_CLIENT_SECRET
+# - APPLE_CLIENT_ID
+# - APPLE_TEAM_ID
+# - APPLE_KEY_ID
+# - APPLE_PRIVATE_KEY
+```
+
+### `nodejs_compat` flag
+
+The `compatibility_flags = ["nodejs_compat"]` setting enables the Node.js compatibility layer in the Cloudflare Workers runtime. This polyfills core Node.js APIs (such as `crypto`, `buffer`, and `stream`) that packages like Fastify and Supabase depend on. Without this flag, many npm packages that target Node.js will throw errors at runtime.
+
+## Deploy to Cloudflare Workers
+
+<Steps>
+  <Step title="Install Wrangler">
+    Wrangler is already listed as a dev dependency in `package.json`. Install it with:
+
+    ```bash
+    pnpm install
+    ```
+
+    Verify the installation:
+
+    ```bash
+    npx wrangler --version
+    ```
+
+    Then authenticate with your Cloudflare account:
+
+    ```bash
+    npx wrangler login
+    ```
+
+    This opens a browser window to authorize the CLI.
+  </Step>
+
+  <Step title="Configure secrets">
+    Cloudflare Workers do not use `.env` files. Each environment variable must be added as a **secret** using `wrangler secret put`. Secrets are encrypted at rest and injected into the Worker at runtime.
+
+    Add all required secrets:
+
+    ```bash
+    # Required secrets
+    npx wrangler secret put SUPABASE_URL
+    npx wrangler secret put SUPABASE_ANON_KEY
+    npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+    npx wrangler secret put JWT_SECRET
+    npx wrangler secret put FRONTEND_URL
+    ```
+
+    Each command prompts you to paste the secret value. The value is never stored in plaintext.
+
+    If you use OAuth providers, add these optional secrets as well:
+
+    ```bash
+    # Optional — Google OAuth
+    npx wrangler secret put GOOGLE_CLIENT_ID
+    npx wrangler secret put GOOGLE_CLIENT_SECRET
+
+    # Optional — Apple Sign-In
+    npx wrangler secret put APPLE_CLIENT_ID
+    npx wrangler secret put APPLE_TEAM_ID
+    npx wrangler secret put APPLE_KEY_ID
+    npx wrangler secret put APPLE_PRIVATE_KEY
+    ```
+
+    <Tip>
+      To list secrets already configured for your Worker, run `npx wrangler secret list`.
+    </Tip>
+  </Step>
+
+  <Step title="Deploy the Worker">
+    Deploy to Cloudflare's global network:
+
+    ```bash
+    npx wrangler deploy
+    ```
+
+    Wrangler bundles `src/index.ts` and its dependencies, uploads the bundle, and prints the Worker URL:
+
+    ```
+    Deployed auth-backend (VERSION) triggers:
+      https://auth-backend.<your-subdomain>.workers.dev
+    ```
+
+    <Note>
+      To preview the Worker locally before deploying, run `npx wrangler dev`. This starts a local emulator at `http://localhost:8787`.
+    </Note>
+  </Step>
+</Steps>
+
+## Required secrets reference
+
+The following table lists every variable from `.env.example` and how to supply it in a Workers deployment:
+
+| Variable | Required | Description |
+|---|---|---|
+| `SUPABASE_URL` | Yes | Your Supabase project URL |
+| `SUPABASE_ANON_KEY` | Yes | Supabase anonymous (public) key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key (admin access) |
+| `JWT_SECRET` | Yes | Secret used to sign JWTs (minimum 32 characters) |
+| `FRONTEND_URL` | Yes | Allowed CORS origin for the frontend |
+| `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |
+| `APPLE_CLIENT_ID` | No | Apple Sign-In service ID |
+| `APPLE_TEAM_ID` | No | Apple developer team ID |
+| `APPLE_KEY_ID` | No | Apple Sign-In key ID |
+| `APPLE_PRIVATE_KEY` | No | Apple Sign-In private key (PEM format) |
+
+`ENVIRONMENT` is set as a plain `[vars]` entry in `wrangler.toml` and does not need to be a secret.
+
+<Warning>
+  The `SUPABASE_SERVICE_ROLE_KEY` grants full database access. Treat it as a sensitive credential and never expose it in client-side code or logs.
+</Warning>
+
+## Differences from traditional Node.js deployment
+
+Cloudflare Workers run in a V8 isolate, not a standard Node.js process. There are several important differences to be aware of:
+
+| Aspect | Node.js / Docker | Cloudflare Workers |
+|---|---|---|
+| Runtime | Node.js process (persistent) | V8 isolate (stateless, per-request) |
+| Environment variables | `.env` file or `--env-file` flag | `wrangler secret put` / `[vars]` in `wrangler.toml` |
+| Entry point | `dist/server.js` (compiled output) | `src/index.ts` (bundled by Wrangler) |
+| Port binding | Fastify binds to `0.0.0.0:8080` | No port binding — Workers respond to HTTP fetch events |
+| File system | Full read/write access | No file system access |
+| Startup time | Seconds (cold start) | Milliseconds (edge-optimized) |
+| Node.js built-ins | Native | Polyfilled via `nodejs_compat` flag |
+
+<Warning>
+  Cloudflare Workers do not support all Node.js APIs. Modules that rely on `fs`, `child_process`, `net`, or native addons will not work in the Workers runtime, even with `nodejs_compat` enabled. Verify all dependencies are Workers-compatible before deploying.
+</Warning>
+
+<Warning>
+  Workers have a CPU time limit per request (50ms on the free plan, 30 seconds on paid plans). Long-running operations such as heavy cryptography or large database queries may be interrupted.
+</Warning>
+
+## Managing secrets across environments
+
+Wrangler supports named environments (e.g., `staging`, `production`) defined in `wrangler.toml`. To add a secret to a specific environment, use the `--env` flag:
+
+```bash
+npx wrangler secret put JWT_SECRET --env production
+npx wrangler secret put JWT_SECRET --env staging
+```
+
+Secrets scoped to an environment are only available in that environment's Worker deployment.
